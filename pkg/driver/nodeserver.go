@@ -181,9 +181,12 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: The volume capability must provider")
 	}
 	mountInfo := volCap.GetMount()
-	fsType := mountInfo.FsType
-	if fsType == "" {
-		fsType = FSTypeExt4
+	var fsType string
+	if mountInfo != nil {
+		fsType = mountInfo.FsType
+		if fsType == "" {
+			fsType = FSTypeExt4
+		}
 	}
 	mountOptions := []string{"bind"}
 	if req.GetReadonly() {
@@ -409,8 +412,12 @@ func (n *nodeServer) nodePublishBlockVolume(req *csi.NodePublishVolumeRequest, n
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("NodePublishVolume: Can not initial connector. Error: %s", err.Error()))
 	}
-	devicePath := conn.GetDevicePath()
-	// View the target path dir whether symlink
+	result, err := conn.ConnectVolume()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("nodePublishBlockVolume: Connector the volume %s failed, %v", volumeID, err))
+	}
+	klog.V(3).Infof("nodePublishBlockVolume: Connector the volume %s success!", volumeID)
+	devicePath := result["path"]
 	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, podVolumePath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("NodePublishVolume: Get the volume path %s has syslink failed, %v", podVolumePath, err))

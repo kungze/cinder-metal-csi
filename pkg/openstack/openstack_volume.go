@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/noauth"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/attachments"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
@@ -331,25 +333,35 @@ func (op *Openstack) ExpandVolume(volumeID string, status string, size int) erro
 	opts := volumeactions.ExtendSizeOpts{
 		NewSize: size,
 	}
+	var blockStorageServiceClient *gophercloud.ServiceClient
+	var err error
 	switch status {
 	case volumeInUseStates:
-		provider := op.BlockStorageClient.ProviderClient
-		blockStorageClient, err := openstack.NewBlockStorageV3(provider, op.EsOpts)
-		if err != nil {
-			klog.Error(fmt.Sprintf("Get block storage client failed, %v", err))
-			return err
+		if op.BsOpts.AuthStrategy == "keystone" {
+			blockStorageServiceClient, err = openstack.NewBlockStorageV3(op.BlockStorageClient.ProviderClient, op.EsOpts)
+			if err != nil {
+				klog.Error(fmt.Sprintf("Request get block storage failed, %v", err))
+				return err
+			}
+		} else if op.BsOpts.AuthStrategy == "noauth" {
+			provider, err := noauth.NewClient(gophercloud.AuthOptions{})
+			if err != nil {
+				klog.Error(fmt.Sprintf("Request get noauth client failed, %v", err))
+				return err
+			}
+			blockStorageServiceClient, err = noauth.NewBlockStorageNoAuthV3(provider, noauth.EndpointOpts{
+				CinderEndpoint: op.BsOpts.CinderListenAddr,
+			})
+			if err != nil {
+				klog.Error(fmt.Sprintf("Request get noauth block storage client failed, %v", err))
+				return err
+			}
 		}
-		blockStorageClient.Microversion = "3.42"
+		blockStorageServiceClient.Microversion = "3.42"
 
-		err = volumeactions.ExtendSize(blockStorageClient, volumeID, opts).ExtractErr()
-		if err != nil {
-			return err
-		}
+		return volumeactions.ExtendSize(blockStorageServiceClient, volumeID, opts).ExtractErr()
 	case volumeAvailableStatus:
-		err := volumeactions.ExtendSize(op.BlockStorageClient, volumeID, opts).ExtractErr()
-		if err != nil {
-			return err
-		}
+		return volumeactions.ExtendSize(op.BlockStorageClient, volumeID, opts).ExtractErr()
 	}
 	return fmt.Errorf("volume cannot be resized, when status is %s", status)
 }
