@@ -25,3 +25,10 @@ jobs:
         uses: helm/chart-releaser-action@v1.4.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Push chart packages to kungze.net
+        shell: bash
+        run: |
+          if [ -d ".cr-release-packages/" ]; then
+            find .cr-release-packages/ -name "*.tgz" | xargs -I {} helm cm-push {} ${{ secrets.KUNGZE_CM_URL }} --username ${{ secrets.KUNGZE_CM_USER }} --password ${{ secrets.KUNGZE_CM_PASSWORD }} --force
+          fi
