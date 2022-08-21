@@ -63,12 +63,20 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 	var snapshotID string
 	var sourceVolID string
+	var volContentSource *csi.VolumeContentSource
 
 	snapshotID = req.GetVolumeContentSource().GetSnapshot().GetSnapshotId()
 	if snapshotID != "" {
 		_, err := c.cloud.GetSnapshotByID(snapshotID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the snapshot %s: %v", snapshotID, err)
+		}
+		volContentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Snapshot{
+				Snapshot: &csi.VolumeContentSource_SnapshotSource{
+					SnapshotId: snapshotID,
+				},
+			},
 		}
 	}
 
@@ -77,6 +85,13 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		_, err := c.cloud.GetVolumeByID(sourceVolID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume %s: %v", sourceVolID, err)
+		}
+		volContentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: sourceVolID,
+				},
+			},
 		}
 	}
 	zone, err := c.cloud.GetAvailability()
@@ -88,10 +103,12 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume: Request openstack create volume failed, %v", err))
 	}
 	klog.Infof("CreateVolume: Create the volume %s success!", volume.ID)
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      volume.ID,
 			CapacityBytes: int64(volume.Size) * 1024 * 1024 * 1024,
+			ContentSource: volContentSource,
 		},
 	}, nil
 }
