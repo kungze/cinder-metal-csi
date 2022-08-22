@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cinder-type-create
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "cinder.labels.standard" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      containers:
+        - name: cinder-bootstrap
+          image: {{ template "cinder.api.image" . }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - /tmp/volume-type-create.sh
+          volumeMounts:
+          - mountPath: /tmp
+            name: pod-tmp
+          - mountPath: /tmp/volume-type-create.sh
+            name: cinder-bin
+            subPath: volume-type-create.sh
+      initContainers:
+        - name: init
+          image: {{ template "kubernetes.entrypoint.image" . }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command:
+            - kubernetes-entrypoint
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: PATH
+              value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/
+            - name: DEPENDENCY_SERVICE
+              value: "cinder-api"
+      restartPolicy: OnFailure
+      serviceAccount: {{ .Values.serviceAccountName }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      volumes:
+        - emptyDir: {}
+          name: pod-tmp
+        - configMap:
+            defaultMode: 493
+            name: cinder-bin
+          name: cinder-bin

@@ -1,0 +1,12 @@
+apiVersion: v2
+description: Deploy noauth and Cinder for SQLite 
+home: https://github.com/kungze/cinder-metal-csi
+maintainers:
+- name: Kungze
+name: cinder-standalone
+version: 1.0.0
+dependencies:
+  - name: rabbitmq-standalone
+    condition: rabbitmq.enabled
+    version: "1.0.0"
+    repository: "https://github.com/kungze/cinder-metal-csi"
