@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cinder-pvc-lvm-clone
+spec:
+  dataSource:
+    name: cinder-pvc-lvm
+    kind: PersistentVolumeClaim
+    apiGroup: ""
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: cinder-metal-csi-lvm
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    volumeMounts:
+      - mountPath: /var/lib/www/html
+        name: csi-data
+  volumes:
+  - name: csi-data
+    persistentVolumeClaim:
+      claimName: cinder-pvc-lvm-clone
+      readOnly: false

@@ -4,6 +4,7 @@ metadata:
   name: cinder-metal-csi-rbd
   namespace: kube-system
 provisioner: cinder.metal.csi
+allowVolumeExpansion: true
 parameters:
   cinderVolumeType: rbd
   csi.storage.k8s.io/node-stage-secret-name: cinder-metal-csi-rbd

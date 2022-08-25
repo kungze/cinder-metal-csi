@@ -124,7 +124,7 @@ stringData:
 
 **NOTE**: Update `auth-url` with correct value.
 
-#### Create a `Secret` for ceph `volumes` pool
+#### Create a `Secret` for ceph `volumes` pool (optional)
 
 If your openstack environment support use ceph rbd as cinder's
 backend, and the `cinder-volume` don't config `rbd_keyring_conf` or `rbd_user`
@@ -154,15 +154,7 @@ kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/
 kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/manifests/cinder-metal-csi-nodeplugin.yaml
 ```
 
-### Create `StorageClass`s and `CSIDriver`
-
-#### CSIDriver
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/manifests/cinder-metal-csi-driver.yaml
-```
-
-#### StorageClass
+### Create `StorageClass`s for different cinder volume types
 
 Currently, we just support two connection protocols to attach cinder backend: `rbd` and `iscsi`.
 In future, we will support all connection protocols of the cinder supported.
@@ -196,6 +188,8 @@ metadata:
   name: cinder-metal-csi-lvm
   namespace: kube-system
 provisioner: cinder.metal.csi
+# If the cinder volume backent don't support expansion, the value should set as false
+allowVolumeExpansion: true
 parameters:
   cinderVolumeType: lvm
 ```
@@ -232,6 +226,8 @@ metadata:
   name: cinder-metal-csi-rbd
   namespace: kube-system
 provisioner: cinder.metal.csi
+# If the cinder volume backent don't support expansion, the value should set as false
+allowVolumeExpansion: true
 parameters:
   cinderVolumeType: rbd
   csi.storage.k8s.io/node-stage-secret-name: cinder-metal-csi-rbd
@@ -241,13 +237,30 @@ parameters:
 The parameter `csi.storage.k8s.io/node-stage-secret-name` and `csi.storage.k8s.io/node-stage-secret-namespace` used to provide
 authentication informations to `cinder-metal-csi` for cinder volume rbd pool.
 
+### Create `VolumeSnapshotClass`
+
+The `cinder-metal-csi` plugin also support k8s
+[volume snapshot](https://kubernetes.io/docs/concepts/storage/volume-snapshots/),
+if you want to use this feature you need to create `VolumeSnapshotClass` firstly.
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/manifests/snapshotclass.yaml
+```
+
 ### Test
 
 Now, we already install `cinder-metal-csi` and completed related configuration. Let's create `pvc` and `pod` to test it.
 
+Use cinder `lvm` volume type as the backend of k8s persistent volume:
+
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/example/nginx-lvm.yaml
-kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/example/nginx-rbd.yaml
+kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/examples/nginx-lvm.yaml
+```
+
+Use cinder `rbd` volume type as the backend of k8s persistent volume:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kungze/cinder-metal-csi/main/examples/nginx-rbd.yaml
 ```
 
 Check the PVCs created by above command:
@@ -272,9 +285,12 @@ Check the cinder volumes related to above pvc:
 
 **Note**:  Use correct value to replace the value of the `--tenant-id` option,  The `tenant-id` can be retrieve by command `openstack project list`.
 
+## More features
+
+You can find more features's usage in directory [examples](https://github.com/kungze/cinder-metal-csi/tree/main/examples).
+
 ## Roadmap
 
-* Support attach raw block device to pod
 * Support local attachment for lvm backend
 * Support volume multiple mount
 * Add k8s e2e test

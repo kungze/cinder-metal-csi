@@ -1,0 +1,34 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-pvc-block
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Block
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: cinder-metal-csi-lvm
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-block
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    volumeDevices:
+      - devicePath: /dev/xvda
+        name: csi-data-cinderplugin
+  volumes:
+  - name: csi-data-cinderplugin
+    persistentVolumeClaim:
+      claimName: csi-pvc-block
+      readOnly: false
