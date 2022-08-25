@@ -1,96 +1,96 @@
-# This YAML file contains driver-registrar & csi driver nodeplugin API objects,
-# which are necessary to run csi nodeplugin for cinder.
 ---
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: iscsid-config-json
-  namespace: kube-system
-data:
-  iscsi.json: |
-    {
-      "command": "iscsid -d 8 -f",
-      "config_files": []
-    }
----
-kind: DaemonSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: cinder-metal-csi-nodeplugin
+  name: cinder-metal-csi-controller-plugin
   namespace: kube-system
 spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
-      app: cinder-metal-csi-nodeplugin
+      app: cinder-metal-csi-controller-plugin
   template:
     metadata:
       labels:
-        app: cinder-metal-csi-nodeplugin
+        app: cinder-metal-csi-controller-plugin
     spec:
-      tolerations:
-        - operator: Exists
-      serviceAccount: cinder-metal-csi-node-sa
-      hostNetwork: true
-      hostIPC: true
-      hostPID: true
+      serviceAccount: cinder-metal-csi-controller-sa
+      nodeSelector:
+        controller: enabled
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-        - name: node-driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+        - name: csi-attacher
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
           args:
             - "--csi-address=$(ADDRESS)"
-            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+            - "--timeout=3m"
+            - "--leader-election=true"
           env:
             - name: ADDRESS
-              value: /csi/csi.sock
-            - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/cinder.csi.openstack.org/csi.sock
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
           imagePullPolicy: "IfNotPresent"
           volumeMounts:
             - name: socket-dir
-              mountPath: /csi
-            - name: registration-dir
-              mountPath: /registration
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-provisioner
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--timeout=3m"
+            - "--default-fstype=ext4"
+            - "--extra-create-metadata"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-snapshotter
+          image: k8s.gcr.io/sig-storage/csi-snapshotter:v4.2.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--timeout=3m"
+            - "--extra-create-metadata"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - name: csi-resizer
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--timeout=3m"
+            - "--handle-volume-inuse-error=false"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: liveness-probe
           image: k8s.gcr.io/sig-storage/livenessprobe:v2.5.0
           args:
-            - --csi-address=/csi/csi.sock
-          volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
-        - name: iscsid
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
-          image: kolla/centos-binary-iscsid:yoga
-          imagePullPolicy: "IfNotPresent"
+            - "--csi-address=$(ADDRESS)"
           env:
-            - name: KOLLA_CONFIG_STRATEGY
-              value: "COPY_ALWAYS"
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
-            - mountPath: /sys
-              name: host-sys
-            - mountPath: /lib/modules
-              name: lib-modules
-            - mountPath: /run
-              name: run-dir
-            - name: pods-probe-dir
-              mountPath: /dev
-            - name: iscsid-config-json
-              subPath: iscsi.json
-              mountPath: /var/lib/kolla/config_files/config.json
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
         - name: cinder-metal-csi
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
           image: registry.aliyuncs.com/kungze/cinder-metal-csi:main
           imagePullPolicy: "IfNotPresent"
           args:
@@ -109,60 +109,24 @@ spec:
             - name: CLOUD_CONFIG
               value: /etc/cloud/cloud.conf
           volumeMounts:
-            - mountPath: /sys
-              name: host-sys
-            - mountPath: /lib/modules
-              name: lib-modules
-            - mountPath: /run
-              name: run-dir
-            - name: pods-probe-dir
-              mountPath: /dev
             - name: socket-dir
               mountPath: /csi
-            - name: kubelet-dir
-              mountPath: /var/lib/kubelet
-              mountPropagation: "Bidirectional"
             - name: csi-config
               mountPath: /etc/cloud
               readOnly: true
-            - name: ceph-keyring-tmp-dir
-              mountPath: /tmp/csi/keys
       volumes:
         - name: socket-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins/cinder.csi.openstack.org
-            type: DirectoryOrCreate
-        - name: registration-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins_registry/
-            type: Directory
-        - name: kubelet-dir
-          hostPath:
-            path: /var/lib/kubelet
-            type: Directory
-        - name: pods-probe-dir
-          hostPath:
-            path: /dev
-            type: Directory
+          emptyDir: {}
         - name: csi-config
           secret:
             secretName: cinder-metal-csi-config
-        - hostPath:
-            path: /sys
-            type: ""
-          name: host-sys
-        - hostPath:
-            path: /lib/modules
-            type: ""
-          name: lib-modules
-        - hostPath:
-            path: /run
-            type: DirectoryOrCreate
-          name: run-dir
-        - configMap:
-            defaultMode: 292
-            name: iscsid-config-json
-          name: iscsid-config-json
-        - name: ceph-keyring-tmp-dir
-          emptyDir: {}
-
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: cinder.metal.csi
+spec:
+  attachRequired: true
+  podInfoOnMount: true
+  volumeLifecycleModes:
+    - Persistent

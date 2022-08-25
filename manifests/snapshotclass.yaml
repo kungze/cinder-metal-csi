@@ -1,0 +1,7 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: cinder-metal-csi-snapshot
+driver: cinder.metal.csi
+deletionPolicy: Delete

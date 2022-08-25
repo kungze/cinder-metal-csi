@@ -1,9 +1,0 @@
-apiVersion: storage.k8s.io/v1
-kind: CSIDriver
-metadata:
-  name: cinder.metal.csi
-spec:
-  attachRequired: true
-  podInfoOnMount: true
-  volumeLifecycleModes:
-    - Persistent

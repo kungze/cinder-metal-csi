@@ -4,5 +4,6 @@ metadata:
   name: cinder-metal-csi-lvm
   namespace: kube-system
 provisioner: cinder.metal.csi
+allowVolumeExpansion: true
 parameters:
   cinderVolumeType: lvm
