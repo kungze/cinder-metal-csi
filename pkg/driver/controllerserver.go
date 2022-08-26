@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -12,11 +13,21 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
+
+const cinderVolumeType = "cinderVolumeType"
 
 type ControllerServer struct {
 	driver *Driver
 	cloud  openstack.IOpenstack
+	client kubernetes.Clientset
 }
 
 func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -28,7 +39,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	if size < 1 {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume: The cinder volume size not less than 1")
 	}
-	volumeType := req.GetParameters()["type"]
+	volumeType := req.GetParameters()[cinderVolumeType]
 	if volumeType == "" {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume: The volume type must")
 	}
@@ -103,12 +114,34 @@ func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, request *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ControllerPublishVolume is not yet implemented")
+func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume: The volume ID is required.")
+	}
+	nodeObj, err := c.client.CoreV1().Nodes().Get(context.TODO(), req.GetNodeId(), metav1.GetOptions{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("ControllerPublishVolume: Encounter err when retrieve the informations of node %s.", req.GetNodeId()))
+	}
+	attachment, err := c.cloud.CreateVolumeAttachment(volumeID, string(nodeObj.GetUID()))
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("ControllerPublishVolume: Failed to create attachment: %v", err))
+	}
+	return &csi.ControllerPublishVolumeResponse{
+		PublishContext: map[string]string{"attachmentID": attachment.ID},
+	}, nil
 }
 
-func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, request *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ControllerUnpublishVolume is not yet implemented")
+func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Error(codes.NotFound, "ControllerPublishVolume: The volume ID not exists!!")
+	}
+	err := c.cloud.DeleteVolumeAttachment(volumeID)
+	if err != nil {
+		return nil, err
+	}
+	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 func (c *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, request *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
@@ -289,6 +322,9 @@ func (c *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("ControllerExpandVolume: Get volume %s info failed, %v", volumeID, err))
 	}
+	if vol == nil {
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("ControllerExpandVolume: Volume %s could not found.", volumeID))
+	}
 	size := RoundOffBytes(sizeBytes)
 	if size < vol.Size {
 		klog.Infof(fmt.Sprintf("ControllerExpandVolume: Request extend cinder volume size %d must greater exists volume size %d", size, vol.Size))
@@ -317,6 +353,9 @@ func (c *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.Con
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("ControllerGetVolume: Get volume %s info failed, %v", volumeID, err))
 	}
+	if vol == nil {
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("ControllerGetVolume: Cinder volume %s not found", volumeID))
+	}
 	var status *csi.ControllerGetVolumeResponse_VolumeStatus
 	for _, v := range vol.Attachments {
 		status.PublishedNodeIds = append(status.PublishedNodeIds, v.HostName)
@@ -332,8 +371,21 @@ func (c *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.Con
 }
 
 func NewControllerServer(d *Driver, cloud openstack.IOpenstack) csi.ControllerServer {
+	var config *rest.Config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homedir.HomeDir(), ".kube", "config"))
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
 	return &ControllerServer{
 		driver: d,
 		cloud:  cloud,
+		client: *clientset,
 	}
 }

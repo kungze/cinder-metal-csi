@@ -2,12 +2,14 @@ package openstack
 
 import (
 	"fmt"
-	"gopkg.in/ini.v1"
 	"strings"
+
+	"gopkg.in/ini.v1"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/noauth"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/attachments"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"k8s.io/klog/v2"
@@ -32,10 +34,14 @@ type IOpenstack interface {
 	ListSnapshot(filter map[string]string) ([]snapshots.Snapshot, string, error)
 	GetSnapshotByID(snapshotID string) (*snapshots.Snapshot, error)
 	ExpandVolume(volumeID string, status string, size int) error
-	InitializeConnection(volumeID string) (map[string]interface{}, error)
 	GetBsOpts() BlockStorage
 	CheckBlockStorageAPI() error
 	GetMaxVolumeLimit() int64
+	CreateVolumeAttachment(volumeID, instanceID string) (*attachments.Attachment, error)
+	GetVolumeAttachment(attachmentID string) (*attachments.Attachment, error)
+	DeleteVolumeAttachment(volumeID string) error
+	VolumeAttachmentComplete(attachmentID string) error
+	GetAttachmentByVolumeID(volumeID string) (*attachments.Attachment, error)
 }
 
 type Global struct {
@@ -54,9 +60,6 @@ type BlockStorage struct {
 	AuthStrategy          string `ini:"auth-strategy"`
 	CinderListenAddr      string `ini:"cinder-listen-addr"`
 	NodeVolumeAttachLimit int64  `ini:"node-volume-attach-limit"`
-	LvmVolumeType         string `ini:"lvm-volume-type"`
-	CephVolumeType        string `ini:"ceph-volume-type"`
-	LocalVolumeType       string `ini:"local-volume-type"`
 }
 
 type Openstack struct {
@@ -115,9 +118,6 @@ func CreateOpenstackClient(cloudConf string) (IOpenstack, error) {
 			AuthStrategy:          config.AuthStrategy,
 			CinderListenAddr:      config.CinderListenAddr,
 			NodeVolumeAttachLimit: config.NodeVolumeAttachLimit,
-			LocalVolumeType:       config.LocalVolumeType,
-			LvmVolumeType:         config.LvmVolumeType,
-			CephVolumeType:        config.CephVolumeType,
 		},
 		EsOpts: esOpts,
 	}
