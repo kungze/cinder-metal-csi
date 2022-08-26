@@ -26,7 +26,7 @@ func ExecIscsiadm(portalIP string, iqn string, args []string) (string, error) {
 
 	out, err := Execute("iscsiadm", cmd...)
 	if err != nil {
-		klog.Errorf("failed to execute iscsiadm %s command", args, err)
+		klog.Errorf("failed to execute iscsiadm %s command. Error: %s. Error output: %s.", args, err.Error(), out)
 		return "", err
 	}
 	klog.V(3).Infof("Exec iscsiadm -m node -T %s -p %s %s command success", iqn, portalIP, args)

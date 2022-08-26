@@ -1,15 +1,22 @@
 package brick
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/kungze/cinder-metal-csi/pkg/brick/iscsi"
-	"github.com/kungze/cinder-metal-csi/pkg/brick/local"
 	"github.com/kungze/cinder-metal-csi/pkg/brick/rbd"
+	"github.com/kungze/cinder-metal-csi/pkg/brick/utils"
+)
+
+// Support connection protocl
+const (
+	RBD   = "RBD"
+	ISCSI = "ISCSI"
 )
 
 // ConnProperties is base class interface
-type ConnProperties interface {
+type Connnnector interface {
 	ConnectVolume() (map[string]string, error)
 	DisConnectVolume() error
 	ExtendVolume() (int64, error)
@@ -17,16 +24,13 @@ type ConnProperties interface {
 }
 
 // NewConnector Build a Connector object based upon protocol and architecture
-func NewConnector(protocol string, connInfo map[string]interface{}) ConnProperties {
+func NewConnector(connInfo map[string]interface{}, extraAuth map[string]string) (Connnnector, error) {
+	protocol := utils.ToString(connInfo["driver_volume_type"])
 	switch strings.ToUpper(protocol) {
-	case "RBD":
-		// Only supported local attach volume
-		connInfo["do_local_attach"] = true
-		return rbd.NewRBDConnector(connInfo)
-	case "LOCAL":
-		return local.NewLocalConnector(connInfo)
-	case "ISCSI":
-		return iscsi.NewISCSIConnector(connInfo)
+	case RBD:
+		return rbd.NewRBDConnector(connInfo, extraAuth), nil
+	case ISCSI:
+		return iscsi.NewISCSIConnector(connInfo), nil
 	}
-	return nil
+	return nil, fmt.Errorf("The 'driver_volume_type': %s don't support.", protocol)
 }
