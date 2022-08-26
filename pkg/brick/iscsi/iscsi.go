@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/kungze/cinder-metal-csi/pkg/brick/common"
 	"github.com/kungze/cinder-metal-csi/pkg/brick/utils"
 	"k8s.io/klog/v2"
 )
@@ -14,42 +13,31 @@ var RetryCount int = 10
 
 // ConnISCSI contains iscsi volume info
 type ConnISCSI struct {
-	targetDiscovered bool
-	targetPortal     string
-	targetPortals    []string
-	targetIqn        string
-	targetIqns       []string
-	targetLun        int
-	targetLuns       []int
-	volumeID         string
-	authMethod       string
-	authUsername     string
-	authPassword     string
-	QosSpecs         string
-	AccessMode       string
-	Encrypted        bool
+	targetPortal  string
+	targetPortals []string
+	targetIqn     string
+	targetIqns    []string
+	targetLun     int
+	targetLuns    []int
+	authMethod    string
+	authUsername  string
+	authPassword  string
 }
 
 // NewISCSIConnector Return ConnRbd Pointer to the object
 func NewISCSIConnector(connInfo map[string]interface{}) *ConnISCSI {
-	data := connInfo["data"].(map[string]interface{})
 	conn := &ConnISCSI{}
-	conn.targetDiscovered = utils.ToBool(data["target_discovered"])
-	conn.targetPortal = utils.ToString(data["target_portal"])
-	if data["target_portals"] != nil && data["target_iqns"] != nil && data["target_luns"] != nil {
-		conn.targetPortals = utils.ToStringSlice(data["target_portals"])
-		conn.targetIqns = utils.ToStringSlice(data["target_iqns"])
-		conn.targetLuns = utils.ToIntSlice(data["target_luns"])
+	conn.targetPortal = utils.ToString(connInfo["target_portal"])
+	if connInfo["target_portals"] != nil && connInfo["target_iqns"] != nil && connInfo["target_luns"] != nil {
+		conn.targetPortals = utils.ToStringSlice(connInfo["target_portals"])
+		conn.targetIqns = utils.ToStringSlice(connInfo["target_iqns"])
+		conn.targetLuns = utils.ToIntSlice(connInfo["target_luns"])
 	}
-	conn.targetIqn = utils.ToString(data["target_iqn"])
-	conn.targetLun = utils.ToInt(data["target_lun"])
-	conn.volumeID = utils.ToString(data["volume_id"])
-	conn.authMethod = utils.ToString(data["auth_method"])
-	conn.authUsername = utils.ToString(data["auth_username"])
-	conn.authPassword = utils.ToString(data["auth_password"])
-	conn.QosSpecs = utils.ToString(data["qos_specs"])
-	conn.AccessMode = utils.ToString(data["access_mode"])
-	conn.Encrypted = utils.ToBool(data["encrypted"])
+	conn.targetIqn = utils.ToString(connInfo["target_iqn"])
+	conn.targetLun = utils.ToInt(connInfo["target_lun"])
+	conn.authMethod = utils.ToString(connInfo["auth_method"])
+	conn.authUsername = utils.ToString(connInfo["auth_username"])
+	conn.authPassword = utils.ToString(connInfo["auth_password"])
 	return conn
 }
 
@@ -117,7 +105,7 @@ func (c *ConnISCSI) connectMultiPathVolume() (string, error) {
 
 	var dm string
 	for _, d := range devices {
-		dm, err = common.FindSysfsMultipathDM(d)
+		dm, err = FindSysfsMultipathDM(d)
 		if err == nil {
 			klog.V(3).Infof("found dm device: %v", dm)
 			break
@@ -144,27 +132,27 @@ func (c *ConnISCSI) connectSinglePathVolume() (string, error) {
 }
 
 //getIpsIqnsLuns Build a list of ips, iqns, and luns, use iSCSI discovery to get the information
-func (c *ConnISCSI) getIpsIqnsLuns() []common.Target {
+func (c *ConnISCSI) getIpsIqnsLuns() []Target {
 	if c.targetPortals != nil && c.targetIqns != nil {
 		ipsIqnsLuns := c.getAllTargets()
 		return ipsIqnsLuns
 	} else {
-		target := common.DiscoverIscsiPortals(c.targetPortal, c.targetIqn, c.targetLun)
+		target := DiscoverIscsiPortals(c.targetPortal, c.targetIqn, c.targetLun)
 		return target
 	}
 }
 
 //getAllTargets Get target include ips, iqns, and luns
-func (c *ConnISCSI) getAllTargets() []common.Target {
-	var allTarget []common.Target
+func (c *ConnISCSI) getAllTargets() []Target {
+	var allTarget []Target
 	if len(c.targetPortals) > 1 && len(c.targetIqns) > 1 {
 		for i, portalIP := range c.targetPortals {
-			ips := common.NewTarget(portalIP, c.targetIqns[i], c.targetLun)
+			ips := NewTarget(portalIP, c.targetIqns[i], c.targetLun)
 			allTarget = append(allTarget, ips)
 		}
 		return allTarget
 	}
-	ips := common.NewTarget(c.targetPortal, c.targetIqn, c.targetLun)
+	ips := NewTarget(c.targetPortal, c.targetIqn, c.targetLun)
 	allTarget = append(allTarget, ips)
 	return allTarget
 }
@@ -176,16 +164,16 @@ func (c *ConnISCSI) connVolume(portal string, iqn string, lun int) (string, erro
 		klog.Errorf("Failed get iscsi session failed", err)
 		return "", err
 	}
-	hctl, err := common.GetHctl(sessionId, lun)
+	hctl, err := GetHctl(sessionId, lun)
 	if err != nil {
 		klog.Errorf("Failed get volume hctl ", err)
 		return "", err
 	}
-	if err := common.ScanISCSI(hctl); err != nil {
+	if err := ScanISCSI(hctl); err != nil {
 		klog.Errorf("Failed to rescan target", err)
 		return "", err
 	}
-	device, err := common.GetDeviceName(sessionId, hctl)
+	device, err := GetDeviceName(sessionId, hctl)
 	if err != nil {
 		klog.Errorf("Failed to get device name", err)
 		return "", err
@@ -202,7 +190,7 @@ func (c *ConnISCSI) connectToIscsiPortal(portal string, iqn string) (int, error)
 		return -1, err
 	}
 	for i := 0; i < RetryCount; i++ {
-		sessions, err := common.GetSessions()
+		sessions, err := GetSessions()
 		if err != nil {
 			klog.Errorf("Get iscsi session failed", err)
 			return 0, err
@@ -252,7 +240,7 @@ func (c *ConnISCSI) loginPortal(portal string, iqn string) error {
 func (c *ConnISCSI) cleanupConnection() error {
 	var err error
 	target := c.getAllTargets()
-	deviceMap, err := common.GetConnectionDevices(target)
+	deviceMap, err := GetConnectionDevices(target)
 	if err != nil {
 		klog.Errorf("Get iscsi connection device failed", err)
 		return err
@@ -263,13 +251,13 @@ func (c *ConnISCSI) cleanupConnection() error {
 		isMultiPath = true
 	}
 
-	err = common.RemoveConnection(deviceMap, isMultiPath)
+	err = RemoveConnection(deviceMap, isMultiPath)
 	if err != nil {
 		klog.Errorf("Remove iscsi connection failed", err)
 		return err
 	}
 
-	if err = common.DisconnectConnection(target); err != nil {
+	if err = DisconnectConnection(target); err != nil {
 		klog.Errorf("failed to disconnet iSCSI connection", err)
 		return err
 	}

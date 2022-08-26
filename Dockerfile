@@ -17,6 +17,9 @@ LABEL name="cinder-metal-csi" \
       summary="Cinder CSI Plugin" \
       help="none"
 
+# Create a empty ceph.conf, in order to `rbd` can be run normally.
+RUN mkdir /etc/ceph -p \
+    && touch /etc/ceph/ceph.conf
 COPY dist/cinder-metal-csi_linux_${ARCH}_v1/cinder-metal-csi /bin/
 USER root
 CMD ["/bin/cinder-metal-csi"]

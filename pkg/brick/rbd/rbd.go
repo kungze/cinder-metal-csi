@@ -14,72 +14,77 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	tmpKeyFileLocation   = "/tmp/csi/keys"
+	tmpKeyFileNamePrefix = "keyfile-"
+)
+
+const (
+	cephClientUser = "cephClientUser"
+	cephClientKey = "cephClientKey"
+)
+
 var utilsExecute = utils.Execute
 
 // ConnRbd contains rbd volume info
 type ConnRbd struct {
-	Name          string
-	Hosts         []string
-	Ports         []string
-	ClusterName   string
-	AuthEnabled   bool
-	AuthUserName  string
-	VolumeID      string
-	Discard       bool
-	QosSpecs      string
-	Keyring       string
-	AccessMode    string
-	Encrypted     bool
-	DoLocalAttach bool
+	Name              string
+	monitorAddr       string
+	cephClientUser    string
+	cephClientKeyring string
+}
+
+func joinHostsAndPorts(hosts, ports []string) string {
+	var addr []string
+	for index, host := range hosts {
+		addr = append(addr, utils.ToString(host)+":"+utils.ToString(ports[index]))
+	}
+	return strings.Join(addr, ",")
 }
 
 // NewRBDConnector Return ConnRbd Pointer to the object
-func NewRBDConnector(connInfo map[string]interface{}) *ConnRbd {
-	data := connInfo["data"].(map[string]interface{})
+func NewRBDConnector(connInfo map[string]interface{}, extraAuth map[string]string) *ConnRbd {
 	conn := &ConnRbd{}
-	conn.Name = utils.ToString(data["name"])
-	conn.Hosts = utils.ToStringSlice(data["hosts"])
-	conn.Ports = utils.ToStringSlice(data["ports"])
-	conn.ClusterName = utils.ToString(data["cluster_name"])
-	conn.AuthEnabled = utils.ToBool(data["auth_enabled"])
-	conn.AuthUserName = utils.ToString(data["auth_username"])
-	conn.VolumeID = utils.ToString(data["volume_id"])
-	conn.Discard = utils.ToBool(data["discard"])
-	conn.QosSpecs = utils.ToString(data["qos_specs"])
-	conn.AccessMode = utils.ToString(data["access_mode"])
-	conn.Encrypted = utils.ToBool(data["encrypted"])
-	conn.DoLocalAttach = utils.ToBool(connInfo["do_local_attach"])
+	conn.Name = utils.ToString(connInfo["name"])
+	hosts := utils.ToStringSlice(connInfo["hosts"])
+	ports := utils.ToStringSlice(connInfo["ports"])
+	conn.monitorAddr = joinHostsAndPorts(hosts, ports)
+	if extraAuth[cephClientUser] != "" {
+		conn.cephClientUser = extraAuth[cephClientUser]
+	} else {
+		conn.cephClientUser = utils.ToString(connInfo["auth_username"])
+	}
+	if extraAuth[cephClientKey] != "" {
+		conn.cephClientKeyring = extraAuth[cephClientKey]
+	} else {
+		conn.cephClientKeyring = utils.ToString(connInfo["keyring"])
+    }
 	return conn
 }
 
 // ConnectVolume Connect to a volume
 func (c *ConnRbd) ConnectVolume() (map[string]string, error) {
 	var err error
-	if c.DoLocalAttach {
-		result, err := c.localAttachVolume()
-		if err != nil {
-			klog.Error(fmt.Sprintf("Do local attach volume failed, %v", err))
-			return nil, err
-		}
-		klog.V(3).Infof("RBD Connect Success, Map Path is %s", result["path"])
-		return result, nil
+	result, err := c.localAttachVolume()
+	if err != nil {
+		klog.Error(fmt.Sprintf("Do local attach volume failed, %v", err))
+		return nil, err
 	}
-	return nil, err
+	klog.V(3).Infof("RBD Connect Success, Map Path is %s", result["path"])
+	return result, nil
 }
 
 // DisConnectVolume Disconnect a volume
 func (c *ConnRbd) DisConnectVolume() error {
-	if c.DoLocalAttach {
-		rootDevice := c.findRootDevice()
-		if rootDevice != "" {
-			cmd := []string{"unmap", rootDevice}
-			res, err := utilsExecute("rbd", cmd...)
-			if err != nil {
-				klog.Errorf("Exec rbd unmap failed,", err)
-				return err
-			}
-			klog.V(3).Info("Exec rbd unmap command success", res)
+	rootDevice := c.findRootDevice()
+	if rootDevice != "" {
+		cmd := []string{"unmap", rootDevice}
+		res, err := utilsExecute("rbd", cmd...)
+		if err != nil {
+			klog.Errorf("Exec rbd unmap failed,", err)
+			return err
 		}
+		klog.V(3).Info("Exec rbd unmap command success", res)
 	}
 	return nil
 }
@@ -88,26 +93,23 @@ func (c *ConnRbd) DisConnectVolume() error {
 // Nothing to do, RBD attached volumes are automatically refreshed, but
 // we need to return the new size for compatibility
 func (c *ConnRbd) ExtendVolume() (int64, error) {
-	if c.DoLocalAttach {
-		device := c.findRootDevice()
-		if device == "" {
-			klog.Errorf("device is not exist.")
-			return -1, errors.New("device is not exist")
-		}
-		deviceName := path.Base(device)
-		deviceNumber := deviceName[3:]
-		size, err := ioutil.ReadFile("/sys/devices/rbd/" + deviceNumber + "/size")
-		if err != nil {
-			klog.Errorf("Read /sys/devices/rbd/?/size failed", err)
-			return -1, err
-		}
-		strSize := string(size)
-		vSize := strings.Replace(strSize, "'", "", -1)
-		iSize, _ := strconv.ParseInt(vSize, 10, 64)
-		klog.V(3).Infof("extend volume to %s is success", iSize)
-		return iSize, nil
+	device := c.findRootDevice()
+	if device == "" {
+		klog.Errorf("device is not exist.")
+		return -1, errors.New("device is not exist")
 	}
-	return -1, nil
+	deviceName := path.Base(device)
+	deviceNumber := deviceName[3:]
+	size, err := ioutil.ReadFile("/sys/devices/rbd/" + deviceNumber + "/size")
+	if err != nil {
+		klog.Errorf("Read /sys/devices/rbd/?/size failed", err)
+		return -1, err
+	}
+	strSize := string(size)
+	vSize := strings.Replace(strSize, "'", "", -1)
+	iSize, _ := strconv.ParseInt(vSize, 10, 64)
+	klog.V(3).Infof("extend volume to %s is success", iSize)
+	return iSize, nil
 }
 
 // findRootDevice Find the underlying /dev/rbd* device for a mapping
@@ -137,6 +139,36 @@ func (c *ConnRbd) findRootDevice() string {
 	return ""
 }
 
+func storeKey(key string) (string, error) {
+	tmpfile, err := ioutil.TempFile(tmpKeyFileLocation, tmpKeyFileNamePrefix)
+	if err != nil {
+		return "", fmt.Errorf("error creating a temporary keyfile: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			// don't complain about unhandled error
+			_ = os.Remove(tmpfile.Name())
+		}
+	}()
+
+	if _, err = tmpfile.WriteString(key); err != nil {
+		return "", fmt.Errorf("error writing key to temporary keyfile: %w", err)
+	}
+
+	keyFile := tmpfile.Name()
+	if keyFile == "" {
+		err = fmt.Errorf("error reading temporary filename for key: %w", err)
+
+		return "", err
+	}
+
+	if err = tmpfile.Close(); err != nil {
+		return "", fmt.Errorf("error closing temporary filename: %w", err)
+	}
+
+	return keyFile, nil
+}
+
 // localAttachVolume Exec local attach volume process
 func (c *ConnRbd) localAttachVolume() (map[string]string, error) {
 	res := map[string]string{}
@@ -146,17 +178,28 @@ func (c *ConnRbd) localAttachVolume() (map[string]string, error) {
 		return nil, err
 	}
 
+	keyFile, err := storeKey(c.cephClientKeyring)
+	if err != nil {
+		return nil, err
+	}
+
+	mapArgs := []string{
+		"--id", c.cephClientUser,
+		"-m", c.monitorAddr,
+		"--keyfile=" + keyFile,
+	}
+
 	volume := strings.Split(c.Name, "/")
 	poolName := volume[0]
 	poolVolume := volume[1]
 	rbdDevPath := c.GetDevicePath()
 	_, err = os.Readlink(rbdDevPath)
 	if err != nil {
-		cmd := []string{"map", poolVolume, "--pool", poolName}
+		mapArgs := append(mapArgs, "map", poolVolume, "--pool", poolName)
 		klog.Infof("Start exec map the pool %s the volume %s command", poolName, poolVolume)
-		result, err := utilsExecute("rbd", cmd...)
+		result, err := utilsExecute("rbd", mapArgs...)
 		if err != nil {
-			klog.Error(fmt.Sprintf("rbd map command exec failed, %v", err))
+			klog.Error(fmt.Sprintf("rbd map command exec failed: %v, Error msg: %s", err, result))
 			return nil, err
 		}
 		klog.Infof("command succeeded: rbd map path is %s", result)
