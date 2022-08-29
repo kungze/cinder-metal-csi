@@ -98,8 +98,8 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - /bin/cinder-metal-csi
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--cloud-conf=$(CLOUD_CONFIG)"
+            - "--endpoint=$(ADDRESS)"
+            - "--cloud-conf=/etc/cloud/cloud.conf"
             - "--node-id=$(NODE_ID)"
             - "--v=3"
           env:
@@ -107,19 +107,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
-            - name: CLOUD_CONFIG
-              value: /etc/cloud/cloud.conf
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
-            - name: secret-cinder-plugin
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+            - name: csi-config
               mountPath: /etc/cloud
               readOnly: true
       volumes:
         - name: socket-dir
           emptyDir: {}
-        - name: secret-cinder-plugin
+        - name: csi-config
           secret:
-            secretName: cloud-config
+            secretName: cinder-metal-csi-config

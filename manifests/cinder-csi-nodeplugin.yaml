@@ -70,9 +70,6 @@ spec:
               name: run-dir
             - name: pods-probe-dir
               mountPath: /dev
-            - name: cinder-cm
-              subPath: iscsi.json
-              mountPath: /var/lib/kolla/config_files/config.json
         - name: cinder-metal-csi
           securityContext:
             privileged: true
@@ -113,12 +110,6 @@ spec:
             - name: secret-cinderplugin
               mountPath: /etc/cloud
               readOnly: true
-            - mountPath: /etc/ceph/ceph.conf
-              name: cinder-cm
-              subPath: ceph.conf
-            - mountPath: /etc/ceph/keyring
-              name: ceph-keyring
-              subPath: key
       volumes:
         - name: socket-dir
           hostPath:
@@ -151,11 +142,3 @@ spec:
             path: /run
             type: DirectoryOrCreate
           name: run-dir
-        - configMap:
-            defaultMode: 292
-            name: cinder-cm
-          name: cinder-cm
-        - name: ceph-keyring
-          secret:
-            defaultMode: 420
-            secretName: cinder-volume-rbd-keyring
