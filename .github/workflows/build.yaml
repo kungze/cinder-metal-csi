@@ -2,27 +2,43 @@ name: build-and-push
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - 'main'
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - 'main'
 
 jobs:
-  goreleaser:
+  docker:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
+      - name: Login to DockerHub
+        uses: docker/login-action@v1.12.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to aliyun registry
+        uses: docker/login-action@v1.12.0
+        with:
+          registry: registry.aliyuncs.com
+          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      - name: Checkout
         uses: actions/checkout@v3
-      -
-        name: Fetch all tags
+
+      - name: Fetch all tags
         run: git fetch --force --tags
-      -
-        name: Set up Go
+
+      - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.18
-      -
-        name: Run GoReleaser
+
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser
@@ -43,26 +59,13 @@ jobs:
         with:
           images: |
             kungze/cinder-metal-csi
-
-      - name: Login to DockerHub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v1.12.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Login to aliyun registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v1.12.0
-        with:
-          registry: registry.aliyuncs.com
-          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
-          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+            registry.aliyuncs.com/kungze/cinder-metal-csi
 
       - name: Build and push
         uses: docker/build-push-action@v2.9.0
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
+
