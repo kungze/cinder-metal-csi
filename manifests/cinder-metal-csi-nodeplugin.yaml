@@ -1,6 +1,18 @@
 # This YAML file contains driver-registrar & csi driver nodeplugin API objects,
 # which are necessary to run csi nodeplugin for cinder.
-
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: iscsid-config-json
+  namespace: kube-system
+data:
+  iscsi.json: |
+    {
+      "command": "iscsid -d 8 -f",
+      "config_files": []
+    }
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -70,16 +82,16 @@ spec:
               name: run-dir
             - name: pods-probe-dir
               mountPath: /dev
-            - name: cinder-cm
-              subPath: iscsi.json
+            - name: iscsid-config-json
               mountPath: /var/lib/kolla/config_files/config.json
+              subPath: iscsi.json
         - name: cinder-metal-csi
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: kungze/cinder-metal-csi:main
+          image: registry.aliyuncs.com/kungze/cinder-metal-csi:main
           imagePullPolicy: "IfNotPresent"
           args:
             - /bin/cinder-metal-csi
@@ -110,15 +122,11 @@ spec:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet
               mountPropagation: "Bidirectional"
-            - name: secret-cinderplugin
+            - name: csi-config
               mountPath: /etc/cloud
               readOnly: true
-            - mountPath: /etc/ceph/ceph.conf
-              name: cinder-cm
-              subPath: ceph.conf
-            - mountPath: /etc/ceph/keyring
-              name: ceph-keyring
-              subPath: key
+            - name: ceph-keyring-tmp-dir
+              mountPath: /tmp/csi/keys
       volumes:
         - name: socket-dir
           hostPath:
@@ -136,9 +144,9 @@ spec:
           hostPath:
             path: /dev
             type: Directory
-        - name: secret-cinderplugin
+        - name: csi-config
           secret:
-            secretName: cloud-config
+            secretName: cinder-metal-csi-config
         - hostPath:
             path: /sys
             type: ""
@@ -151,11 +159,8 @@ spec:
             path: /run
             type: DirectoryOrCreate
           name: run-dir
-        - configMap:
-            defaultMode: 292
-            name: cinder-cm
-          name: cinder-cm
-        - name: ceph-keyring
-          secret:
-            defaultMode: 420
-            secretName: cinder-volume-rbd-keyring
+        - name: iscsid-config-json
+          configMap:
+            name: iscsid-config-json
+        - name: ceph-keyring-tmp-dir
+          emptyDir: {}

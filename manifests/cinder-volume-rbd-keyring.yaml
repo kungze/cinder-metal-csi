@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  key: W2NsaWVudC5hZG1pbl0Ka2V5ID0gQVFBc3hjOWlwVTFFTGhBQWY5elpLWnZ5VlBMTmV2MVhrRVdlS2c9PQo=
-kind: Secret
-metadata:
-  name: cinder-volume-rbd-keyring
-  namespace: kube-system
