@@ -1,0 +1,7 @@
+apiVersion: v2
+description: Deploy standalone rabbitmq
+home: https://github.com/kungze/rabbitmq-standalone
+maintainers:
+- name: Kungze
+name: rabbitmq-standalone
+version: 1.0.0

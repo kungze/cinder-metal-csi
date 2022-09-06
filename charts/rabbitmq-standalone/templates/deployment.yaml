@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "rabbitmq.labels.standard" . |  nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "rabbitmq.labels.matchLabels" . |  nindent 6 }}
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels: {{- include "rabbitmq.labels.standard" . |  nindent 8 }}
+        app.kubernetes.io/component: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.imageRegistry }}/{{ .Values.imageNamespace }}/ubuntu-source-rabbitmq:{{ .Values.openstackTag }}"
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          {{- if .Values.enableLivenessProbe }}
+          livenessProbe:
+            failureThreshold: 3
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 50
+            periodSeconds: 60
+            successThreshold: 1
+            timeoutSeconds: 15
+          {{- end }}
+          {{- if .Values.enableReadinessProbe }}
+          readinessProbe:
+            failureThreshold: 3
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 50
+            periodSeconds: 60
+            successThreshold: 1
+            timeoutSeconds: 15
+          {{- end }}
+          env:
+            - name: KOLLA_CONFIG_STRATEGY
+              value: "COPY_ALWAYS"
+            - name: KOLLA_SERVICE_NAME
+              value: "rabbitmq"
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: amqp
+              containerPort: 5672
+              protocol: TCP
+            - name: dist
+              containerPort: 25672
+              protocol: TCP
+            - name: stats
+              containerPort: 15672
+              protocol: TCP
+            - name: epmd
+              containerPort: 4369
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/log/kolla/rabbitmq
+              name: rabbitmqlog
+            - mountPath: /var/lib/kolla/config_files/rabbitmq.conf
+              name: rabbitmq-etc
+              subPath: rabbitmq.conf
+            - mountPath: /var/lib/kolla/config_files/config.json
+              name: rabbitmq-etc
+              subPath: rabbitmq.json
+            - mountPath: /var/lib/kolla/config_files/definitions.json
+              name: rabbitmq-etc
+              subPath: definitions.json
+            - mountPath: /var/lib/kolla/config_files/rabbitmq-env.conf
+              name: rabbitmq-etc
+              subPath: rabbitmq-env.conf
+            - mountPath: /var/lib/kolla/config_files/erl_inetrc
+              name: rabbitmq-etc
+              subPath: erl_inetrc
+            - mountPath: /var/lib/rabbitmq/
+              name: rabbitmqdata
+          securityContext:
+            runAsUser: 0
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+      serviceAccount: {{ .Values.serviceAccountName}}
+      serviceAccountName: {{ .Values.serviceAccountName}}
+      volumes:
+        - hostPath:
+            path: /var/log/kolla/rabbitmq
+            type: DirectoryOrCreate
+          name: rabbitmqlog
+        - configMap:
+            defaultMode: 365
+            name: rabbitmq-etc
+          name: rabbitmq-etc
+        - hostPath:
+            path: /var/lib/rabbitmq
+            type: DirectoryOrCreate
+          name: rabbitmqdata

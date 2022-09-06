@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-etc
+  namespace: {{ .Release.Namespace | quote }}
+data:
+  rabbitmq.conf: |
+{{ tuple "conf/_rabbitmq.conf.tpl" . | include "rabbitmq.utils.template" | indent 4 }}
+  definitions.json: |
+{{ tuple "conf/_definitions.json.tpl" . | include "rabbitmq.utils.template" | indent 4 }}
+  rabbitmq-env.conf: |
+{{ tuple "conf/_rabbitmq-env.conf.tpl" . | include "rabbitmq.utils.template" | indent 4 }}
+  erl_inetrc: |
+{{ tuple "conf/_erl_inetrc.tpl" . | include "rabbitmq.utils.template" | indent 4 }}
+  rabbitmq.json: |
+{{ tuple "conf/_rabbitmq.json.tpl" . | include "rabbitmq.utils.template" | indent 4 }}

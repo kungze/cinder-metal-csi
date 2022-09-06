@@ -1,0 +1,35 @@
+name: Install rabbitmq-standalone chart
+
+on:
+  pull_request:
+    paths:
+      - 'charts/rabbitmq-standalone/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Fetch history
+        run: git fetch --prune --unshallow
+
+      - name: Set up chart-testing
+        uses: fightdou/chart-testing-action@v2.2.2
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+
+      - name: Create k8s namespace
+        run:
+          kubectl create namespace test-rabbitmq
+
+      - name: Install rabbitmq-standalone chart
+        run: |
+          ct install --namespace test-rabbitmq --target-branch main --charts charts/rabbitmq-standalone --debug --helm-extra-args "--timeout 300s"
+
+      - name: setup tmate session for debugging when event is PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
