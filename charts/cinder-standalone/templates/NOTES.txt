@@ -1,0 +1,11 @@
+CHART NAME: {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+
+1. Set the necessary environment variables:
+    export OS_AUTH_TYPE=noauth
+    export OS_PROJECT_ID=admin
+    export OS_VOLUME_API_VERSION=3.10
+    export CINDER_ENDPOINT=http://cinder-api.{{ .Release.Namespace }}.svc.{{ .Values.cluster_domain_suffix }}:8776/v3
+
+2. Run the following command to check the service status
+    $ cinder service-list

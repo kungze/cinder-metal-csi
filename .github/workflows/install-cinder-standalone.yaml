@@ -1,0 +1,37 @@
+name: Install cinder chart
+
+on:
+  pull_request:
+    paths:
+      - 'charts/cinder-standalone/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Fetch history
+        run: git fetch --prune --unshallow
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.2.1
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+
+      - name: use local disk
+        run: tests/scripts/github-action-helper.sh use_local_disk_for_integration_test
+
+      - name: Create k8s namespace
+        run:
+          kubectl create namespace test-cinder
+
+      - name: Run chart-testing (install)
+        run: ct install --namespace test-cinder --target-branch main --charts charts/cinder-standalone --debug --helm-extra-args "--timeout 600s"
+
+      - name: setup tmate session for debugging when event is PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60

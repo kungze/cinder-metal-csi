@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cinder-bin
+  namespace: {{ .Release.Namespace | quote }}
+data:
+  db-sync.sh: |
+{{ tuple "bin/_db_sync.sh.tpl" . | include "cinder.utils.template" | indent 4 }}
+  lvm-create.sh: |
+{{ tuple "bin/_lvm_create.sh.tpl" . | include "cinder.utils.template" | indent 4 }}
+  lvm-clean.sh: |
+{{ tuple "bin/_lvm_clean.sh.tpl" . | include "cinder.utils.template" | indent 4 }}
+  volume-type-create.sh: |
+{{ tuple "bin/_volume_type_create.sh.tpl" . | include "cinder.utils.template" | indent 4 }}
+  {{- if .Values.ceph.enabled }}
+  gen-ceph-conf.sh: |
+{{ tuple "bin/_gen_ceph_conf.sh.tpl" . | include "cinder.utils.template" | indent 4 }}
+  {{- end }}

@@ -1,0 +1,81 @@
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+## @section Cluster Paramters
+## @param cluster_domain_suffix [t#Cluster Domain Suffix] The doamin suffix of the current k8s cluster
+cluster_domain_suffix: cluster.local
+
+## @section Image Parameters
+## @param imageRegistry [t#Image Registry] The registry address of openstack kolla image
+imageRegistry: "registry.aliyuncs.com"
+## @param imageNamespace [t#Image Namespace] The registry namespace of openstack kolla image
+imageNamespace: "kolla-helm"
+## @param openstackTag [t#Openstack version] The openstack version
+openstackTag: "yoga"
+## @param pullPolicy [t#Pull Policy] The image pull policy
+pullPolicy: "IfNotPresent"
+
+## @section Deployment Parameters
+## @param replicaCount Number of cinder replicas to deploy (requires ReadWriteMany PVC support)
+replicaCount: 1
+## @param serviceAccountName ServiceAccount name
+serviceAccountName: cinder
+## @param enableLivenessProbe [t#Enable Liveness Probe] Whether or not enable liveness probe
+enableLivenessProbe: true
+## @param enableReadinessProbe [t#Enable Readliness Probe] Whether or not enable readiness probe
+enableReadinessProbe: true
+
+## @section Cinder Config parameters
+## @param enabled_notification [t#Enable Notification] Whether or not enable notification
+enabled_notification: false
+lvm:
+  ## @param lvm.enabled [t#Enable Lvm] Whether or not enable lvm backend
+  enabled: true
+  ## @param lvm.vg_name [t#Volume group Name] The volume group name used to as the cinder lvm driver's backend
+  vg_name: cinder-volumes
+  ## @param lvm.create_loop_device [t#Create Loop Device] Whether or not create a loop device for lvm backend. If this set as false, the lvm volume group must be prepared in advance.
+  create_loop_device: true
+  ## @param lvm.loop_device_name [t# Loop Device Name] The loop device's name or disk's name
+  loop_device_name: /dev/loop1
+  ## @param lvm.loop_device_size [t#Loop Device Size] The loop device's size, unit Mb
+  loop_device_size: 2048
+  ## @param lvm.volume_type [t#Cinder Volume Type] The cinder volume type name corresponding with lvm backend
+  volume_type: lvm1
+  ## @param lvm.lvm_target_helper [t#Cinder Lvm Target Helper] Target user-land tool to use
+  lvm_target_helper: tgtadm
+
+ceph:
+  ## @param ceph.enabled [t#Enable Ceph] Whether or not enable ceph backend
+  enabled: false
+  ## @param ceph.volume_type [t#Cinder Volume Type] The cinder volume type name corresponding with ceph backend
+  volume_type: rbd
+  ## @param ceph.poolName [t#Pool Name] The ceph pool name which used to store the cinder volumes
+  poolName: volumes
+  ## @param ceph.replicatedSize [t#Pool Replicated Size] For a pool based on raw copies, specify the number of copies. A size of 1 indicates no redundancy.
+  replicatedSize: 1
+  ## @param ceph.cephClientName [t#Rook Ceph Client Name] The name of rook ceph cephclient
+  cephClientName: cinder
+  backup:
+    ## @param ceph.backup.enabled [t#Enable Cinder Backup] Whether or not enable cinder backup feature
+    enabled: false 
+    ## @param ceph.backup.poolName [t#Backup Pool Name] The name of ceph pool used to store cinder volume backups
+    poolName: backups
+    ## @param ceph.backup.replicatedSize [t#Pool Replicated Size] For a pool based on raw copies, specify the number of copies. A size of 1 indicates no redundancy.
+    replicatedSize: 1
+
+rabbitmq:
+  ## @param rabbitmq.enabled [t#Enable rabbitmq] Whether or not enable deploy rabbitmq
+  enabled: true
+  ## @param rabbitmq.username [t#rabbitmq username] Required for the Cinder connection username
+  username: openatck
+  ## @param rabbitmq.password [t#rabbitmq password] Required for the Cinder connection password
+  password: TXO9pjYDoX
