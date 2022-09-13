@@ -8,10 +8,10 @@ on:
       - 'v*'
   pull_request:
     branches:
-      - 'main'
+      - main
 
 jobs:
-  docker:
+  build-and-push-image:
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub

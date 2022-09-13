@@ -32,7 +32,7 @@ type nodeServer struct {
 }
 
 func (n *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	//req.GetSecrets()
+	klog.Info("Execute NodeStageVolume")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume: The volume id must provider")
@@ -123,6 +123,7 @@ func (n *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 }
 
 func (n *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	klog.Info("Execute NodeUnstageVolume")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume: The volume id must provider")
@@ -164,6 +165,7 @@ func (n *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 }
 
 func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	klog.Info("Execute NodePublishVolume")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: The volume id must provider")
@@ -222,6 +224,7 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 }
 
 func (n *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	klog.Info("Execute NodeUnpublishVolume")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume: The volume id must provider")
@@ -246,6 +249,7 @@ func (n *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 }
 
 func (n *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	klog.Info("Execute NodeGetVolumeStats")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats: The volume id must provider")
@@ -295,6 +299,7 @@ func (n *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVol
 }
 
 func (n *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	klog.Info("Execute NodeExpandVolume")
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeExpandVolume: The volume id must provider")
@@ -346,6 +351,7 @@ func (n *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 }
 
 func (n *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	klog.Info("Execute NodeGetCapabilities")
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: []*csi.NodeServiceCapability{
 			{
@@ -374,6 +380,7 @@ func (n *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
 }
 
 func (n *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	klog.Info("Execute NodeGetInfo")
 	nodeID := n.driver.nodeId
 	maxVolumesPerNode := n.cloud.GetMaxVolumeLimit()
 	return &csi.NodeGetInfoResponse{

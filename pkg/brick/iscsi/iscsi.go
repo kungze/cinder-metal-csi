@@ -75,15 +75,15 @@ func (c *ConnISCSI) ExtendVolume() (int64, error) {
 	return 0, nil
 }
 
-//GetDevicePath Get mount device local path
-func (c *ConnISCSI) GetDevicePath() string {
-	target := c.getAllTargets()
-	var devicePath string
-	for _, i := range target {
-		devicePath = fmt.Sprintf("/dev/disk/by-path/ip-%s-iscsi-%s-lun-%d", i.Portal, i.Iqn, i.Lun)
-	}
-	return devicePath
-}
+// //GetDevicePath Get mount device local path
+// func (c *ConnISCSI) GetDevicePath() string {
+// 	target := c.getAllTargets()
+// 	var devicePath string
+// 	for _, i := range target {
+// 		devicePath = fmt.Sprintf("/dev/disk/by-path/ip-%s-iscsi-%s-lun-%d", i.Portal, i.Iqn, i.Lun)
+// 	}
+// 	return devicePath
+// }
 
 //connectMultiPathVolume Connect to a multipathed volume launching parallel login requests
 func (c *ConnISCSI) connectMultiPathVolume() (string, error) {

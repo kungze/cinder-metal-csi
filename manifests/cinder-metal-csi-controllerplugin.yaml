@@ -20,8 +20,6 @@ spec:
         app: cinder-metal-csi-controller-plugin
     spec:
       serviceAccount: cinder-metal-csi-controller-sa
-      nodeSelector:
-        controller: enabled
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: csi-attacher
@@ -91,7 +89,7 @@ spec:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
         - name: cinder-metal-csi
-          image: registry.aliyuncs.com/kungze/cinder-metal-csi:main
+          image: registry.aliyuncs.com/kungze/cinder-metal-csi:pr-14
           imagePullPolicy: "IfNotPresent"
           args:
             - /bin/cinder-metal-csi

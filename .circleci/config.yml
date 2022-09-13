@@ -1,0 +1,43 @@
+version: 2.1
+
+jobs:
+  run-e2e-tests:
+    machine:
+        image: ubuntu-2004:current
+    resource_class: large
+    steps:
+      - checkout
+
+      - run:
+          name: Prepare rook osd block  device
+          command: |
+            ./.circleci/01create-local-disks.sh
+
+      - run:
+          name: Setup k8s cluster
+          command: |
+            ./.circleci/02setup-k8s-cluster.sh
+
+      - run:
+          name: Set cinder service
+          command: |
+            ./.circleci/03setup-cinder.sh
+
+      - run:
+          name: Install cinder-metal-csi plugin
+          command: |
+            ./.circleci/04install-cinder-metal-csi.sh
+
+      - run:
+          name: Run E2E tests
+          command: |
+            export CEPH_CINDER_KEYRING=$(kubectl -n rook-ceph get secrets rook-ceph-client-cinder -o jsonpath="{.data.cinder}" | base64 --decode)
+            cd $HOME/project/tests/e2e
+              go test . -v -args --cinder-volume-type=rbd --ceph-client-keyring=$CEPH_CINDER_KEYRING
+
+
+workflows:
+  e2e-tests:
+    jobs:
+      - run-e2e-tests:
+          type: approval

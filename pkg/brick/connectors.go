@@ -20,7 +20,7 @@ type Connnnector interface {
 	ConnectVolume() (map[string]string, error)
 	DisConnectVolume() error
 	ExtendVolume() (int64, error)
-	GetDevicePath() string
+	// GetDevicePath() string
 }
 
 // NewConnector Build a Connector object based upon protocol and architecture
