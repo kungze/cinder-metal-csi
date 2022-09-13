@@ -37,7 +37,7 @@ func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 	size := RoundOffBytes(req.GetCapacityRange().GetRequiredBytes())
 	if size < 1 {
-		return nil, status.Error(codes.InvalidArgument, "CreateVolume: The cinder volume size not less than 1")
+		return nil, status.Error(codes.InvalidArgument, "CreateVolume: The cinder volume size require more than 1Gi")
 	}
 	volumeType := req.GetParameters()[cinderVolumeType]
 	if volumeType == "" {
