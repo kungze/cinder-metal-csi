@@ -1,0 +1,17 @@
+name: trigger-circleci
+
+on:
+  pull_request:
+    branches:
+      - 'ddd'
+
+jobs:
+  trigger-circleci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CircleCI Trigger on Pull Request
+        id: d4c189ee-bf48-4756-91d2-8fb898afe627
+        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0
+        env:
+          CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
+

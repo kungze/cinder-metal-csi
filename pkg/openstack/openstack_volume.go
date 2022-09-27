@@ -51,6 +51,10 @@ func (op *Openstack) CreateVolume(name, zone, volType, snapshotID, sourceVolID s
 func (op *Openstack) DeleteVolume(volumeID string) error {
 	err := volumes.Delete(op.BlockStorageClient, volumeID, volumes.DeleteOpts{}).ExtractErr()
 	if err != nil {
+		vol404Msg := fmt.Sprintf("Volume %s could not be found", volumeID)
+		if strings.Contains(err.Error(), vol404Msg) {
+			return nil
+		}
 		return err
 	}
 	return nil
@@ -71,6 +75,10 @@ func (op *Openstack) AttachVolume(volumeID, mountPoint, hostName string) error {
 func (op *Openstack) DetachVolume(volumeID string) error {
 	err := volumeactions.Detach(op.BlockStorageClient, volumeID, volumeactions.DetachOpts{}).ExtractErr()
 	if err != nil {
+		vol404Msg := fmt.Sprintf("Volume %s could not be found", volumeID)
+		if strings.Contains(err.Error(), vol404Msg) {
+			return nil
+		}
 		return err
 	}
 	return nil
@@ -335,6 +343,7 @@ func (op *Openstack) ExpandVolume(volumeID string, status string, size int) erro
 	}
 	var blockStorageServiceClient *gophercloud.ServiceClient
 	var err error
+	var client *gophercloud.ServiceClient
 	switch status {
 	case volumeInUseStates:
 		if op.BsOpts.AuthStrategy == "keystone" {
@@ -358,12 +367,20 @@ func (op *Openstack) ExpandVolume(volumeID string, status string, size int) erro
 			}
 		}
 		blockStorageServiceClient.Microversion = "3.42"
-
-		return volumeactions.ExtendSize(blockStorageServiceClient, volumeID, opts).ExtractErr()
+		client = blockStorageServiceClient
 	case volumeAvailableStatus:
-		return volumeactions.ExtendSize(op.BlockStorageClient, volumeID, opts).ExtractErr()
+		client = op.BlockStorageClient
+	default:
+		return fmt.Errorf("volume cannot be resized, when status is %s", status)
 	}
-	return fmt.Errorf("volume cannot be resized, when status is %s", status)
+	vol, err := volumes.Get(client, volumeID).Extract()
+	if err != nil {
+		return err
+	}
+	if vol.Size == size {
+		return nil
+	}
+	return volumeactions.ExtendSize(client, volumeID, opts).ExtractErr()
 }
 
 func (op *Openstack) GetAvailability() (string, error) {

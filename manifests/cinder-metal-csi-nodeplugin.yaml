@@ -21,11 +21,11 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: cinder-metal-csi-nodeplugin
+      app: cinder-metal-csi-node-plugin
   template:
     metadata:
       labels:
-        app: cinder-metal-csi-nodeplugin
+        app: cinder-metal-csi-node-plugin
     spec:
       tolerations:
         - operator: Exists
@@ -62,36 +62,36 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
-        - name: iscsid
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
-          image: kolla/centos-binary-iscsid:yoga
-          imagePullPolicy: "IfNotPresent"
-          env:
-            - name: KOLLA_CONFIG_STRATEGY
-              value: "COPY_ALWAYS"
-          volumeMounts:
-            - mountPath: /sys
-              name: host-sys
-            - mountPath: /lib/modules
-              name: lib-modules
-            - mountPath: /run
-              name: run-dir
-            - name: pods-probe-dir
-              mountPath: /dev
-            - name: iscsid-config-json
-              mountPath: /var/lib/kolla/config_files/config.json
-              subPath: iscsi.json
+        # - name: iscsid
+        #   securityContext:
+        #     privileged: true
+        #     capabilities:
+        #       add: ["SYS_ADMIN"]
+        #     allowPrivilegeEscalation: true
+        #   image: kolla/centos-binary-iscsid:yoga
+        #   imagePullPolicy: "IfNotPresent"
+        #   env:
+        #     - name: KOLLA_CONFIG_STRATEGY
+        #       value: "COPY_ALWAYS"
+        #   volumeMounts:
+        #     - mountPath: /sys
+        #       name: host-sys
+        #     - mountPath: /lib/modules
+        #       name: lib-modules
+        #     - mountPath: /run
+        #       name: run-dir
+        #     - name: pods-probe-dir
+        #       mountPath: /dev
+        #     - name: iscsid-config-json
+        #       mountPath: /var/lib/kolla/config_files/config.json
+        #       subPath: iscsi.json
         - name: cinder-metal-csi
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: registry.aliyuncs.com/kungze/cinder-metal-csi:main
+          image: registry.aliyuncs.com/kungze/cinder-metal-csi:pr-14
           imagePullPolicy: "IfNotPresent"
           args:
             - /bin/cinder-metal-csi
